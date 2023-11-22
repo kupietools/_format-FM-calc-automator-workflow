@@ -1,0 +1,1 @@
+This is the source code of the perl script in the Automator service that performs that calculation formatting. 
