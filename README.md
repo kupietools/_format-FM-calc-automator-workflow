@@ -10,3 +10,11 @@ The original source code of the PERL script that does the formatting is visible 
 # Credits
 
 This is substantially based on calculation_formatter.pl by Debi Fuchs <debi@aptworks.com> which was originally shared by Filemaker Inc in their Development Conventions PDF whitepaper in Nov. 2005, then heavily customized by me to make code clearer and keep up with changes in FM's calculation formatting beginning in 2012 forwards, as well as my own visual formatting. There are comments in the PERL code giving some info on my changes. 
+
+# I am
+Michael E. Kupietz, software engineering, consulting, & support for FileMaker Pro, Full-Stack Web, Desktop OS, & TradingView platforms  
+https://kupietz.com (Business info)  
+https://github.com/kupietools (Free software)  
+https://michaelkupietz.com (Personal & creative showcase)  
+
+
