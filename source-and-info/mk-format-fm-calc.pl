@@ -661,7 +661,7 @@ sub writeresult {
     if (not $stringsuccess) {
         print "Unmatched quotes or comments. Please be sure to enter a calculation which validates in FileMaker Pro.\<BR\>\r";
     }
-    $theCredit = "/* Formatted with _mkCalcFormatter. Service based on Calculation_formatter.pl © 2008 by Debi Fuchs <debi@aptworks.com> and released under the GNU license. Debugged, modified, updated, and repackaged as a service by Michael Kupietz <fmform@kupietz.com> https://kupietz.com. Updated again at tremendous risk and great personal expense for nicer formatting in 2017. Released under GNU license, see source code for details. Be excellent to each other. */";
+    $theCredit = "/* Formatted with _mkCalcFormatter. Service based on Calculation_formatter.pl © 2008 by Debi Fuchs <debi\@aptworks.com> and released under the GNU license. Debugged, modified, updated, and repackaged as a service by Michael Kupietz <fmform\@kupietz.com> https://kupietz.com. Updated again at tremendous risk and great personal expense for nicer formatting in 2017. Released under GNU license, see source code for details. Be excellent to each other. */";
      $calc =~ s/\r *\Q$theCredit//gi; # \Q quotes meta characters in the variable value so they're not interpreted as regex codes.
     print $calc . "\r" . $theCredit . "\r" ; # . $debug;
 # Don't remove the above credit. No, seriously. Don't be a dick.
