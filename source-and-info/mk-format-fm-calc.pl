@@ -51,6 +51,7 @@
 # Version 3.1 08/21/2008   Debi Fuchs: (Removed comma as separator character (for international use); Made mindepthtoaccommodate a calc; removed filemaker6 code; improved perl indentation; fixed typos in comments )
 # Version 3.5 2013-2016  Michael Kupietz: Repackaged to run an Automator text service so can be used directly in FileMaker calc dialogs, go through the section with a million regexs and add comments documenting what they do so humans can understand, minor formatting tweaks to betterize output morely.
 # Version 4 05/13/2017   Michael Kupietz: Numerous small output formatting improvements, improved indentation, added debugging output (see code), minor tweaks for more recent versions of FileMaker. 
+# Version 4.1 03/19/2024 Kludgy fixes to workaround inexplicable problem with // comments and apparent MacOS change from \r to \n.
 # ------------------------ END ------------------------
 #
 #
@@ -126,7 +127,9 @@ my $i = 0;
 while(<>)
 {
     $i++;
-    $calc= $calc . $_;
+    $thisLine = $_;
+    $thisLine  =~ s/\/\/([^\r]*)/\/\*DOUBLESLASH$1\*\//gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
+    $calc= $calc . $thisLine ;
 }
 
 #If the user wants to exclude indentation from the wraplength, then wraplength including indentation is actually "unlimited"; using a high value here, for that case.
@@ -661,9 +664,12 @@ sub writeresult {
     if (not $stringsuccess) {
         print "Unmatched quotes or comments. Please be sure to enter a calculation which validates in FileMaker Pro.\<BR\>\r";
     }
- $theCredit = "/* Formatted with _Format FM Calc. Service based on Calculation_formatter.pl © 2008 by Debi Fuchs <debi\@aptworks.com> and released under the GNU license. Debugged, modified, updated, and repackaged as a service by Michael Kupietz <consulting-fmsvc\@kupietz.com> https://kupietz.com. Updated again at tremendous risk and great personal expense for nicer formatting in 2017. Released under GNU license, see source code for details. Be excellent to each other. */";
-    $calc =~ s/\r *\Q$theCredit//gi; # \Q quotes meta characters in the variable value so they're not interpreted as regex codes.
-    print $calc . "\r" . $theCredit . "\r" ; # . $debug;
+    $theCredit = "/* Formatted with _Format FM Calc. Service based on Calculation_formatter.pl © 2008 by Debi Fuchs <debi\@aptworks.com> and released under the GNU license. Debugged, modified, updated, and repackaged as a service by Michael Kupietz <consulting-fmsvc\@kupietz.com> https://kupietz.com. Updated again at tremendous risk and great personal expense for nicer formatting in 2017. Released under GNU license, see source code for details. Be excellent to each other. */";
+     $calc =~ s/\r *\Q$theCredit//gi; # \Q quotes meta characters in the variable value so they're not interpreted as regex codes.
+   $calc  =~ s/\/\*DOUBLESLASH([^\r\n]*)\R\*\//\/\/$1/gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
+ $calc =~ s/\r/\n/gi; #hack since mac seems to have adopted \n since I did this MK 2024mar19
+
+    print $calc . "\n" . $theCredit . "\n" ; # . $debug;
 # Don't remove the above credit. No, seriously. Don't be a dick.
 }
 
