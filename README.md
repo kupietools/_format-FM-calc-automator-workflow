@@ -11,7 +11,7 @@ The original source code of the PERL script that does the formatting is visible 
 
 # Important note
 
-One user has reported crashes and memory errors when using this system service in MacOS Sonoma with FileMaker 20. To my knowledge, nobody else has reported these issues, and I have not been able to reproduce them. An issue has been opened for this. Please be aware & prepared for this possibility when you use this, and back up any databases first in case of needing to do an improper shutdown. 
+One user has reported crashes and memory errors when using this system service in MacOS Sonoma with FileMaker 20. To my knowledge, nobody else has reported these issues, and I have not been able to reproduce them. An issue has been opened for this. Please be aware & prepared for this possibility when you use this, and back up any databases first in case of needing to do an improper shutdown. As with all Free & Open Source Software, use entirely at your own risk. In the event of trouble or issues, efforts at support are likely but not guaranteed. 
 
 # Credits
 
