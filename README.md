@@ -9,6 +9,10 @@ Place the unzipped `_Format FM Calc.workflow` in your /Users/[yourname]/Services
 
 The original source code of the PERL script that does the formatting is visible as plain text once you open it within Automator too, if you want to see that. 
 
+# Important note
+
+One user has reported crashes and memory errors when using this system service in MacOS Sonoma with FileMaker 20. To my knowledge, nobody else has reported these issues, and I have not been able to reproduce them. An issue has been opened for this. Please be aware & prepared for this possibility when you use this, and back up any databases first in case of needing to do an improper shutdown. 
+
 # Credits
 
 This is substantially based on calculation_formatter.pl by Debi Fuchs <debi@aptworks.com> which was originally shared by Filemaker Inc in their Development Conventions PDF whitepaper in Nov. 2005, then heavily customized by me to make code clearer and keep up with changes in FM's calculation formatting beginning in 2012 forwards, as well as my own visual formatting. There are comments in the PERL code giving some info on my changes. 
