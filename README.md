@@ -1,5 +1,5 @@
 # _format-FM-calc-automator-workflow
-An Automator workflow for OS X which creats a system service that visually formats FileMaker Pro calculations for easy readability.
+An Automator workflow for OS X which creats a system service that visually formats FileMaker Pro calculations for easy readability, in any app in the system, even outside of FileMaker.
 
 The workflow is packaged here in a compressed zip file because once upon a time I had some problems with Github mangling something in one of MacOS's "package" folder-as-a-document structures, as Automator workflows such as this are. The .zip compression simply ensures the workflow is preserved as-is from my hard drive to yours. 
 
