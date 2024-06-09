@@ -52,10 +52,11 @@
 # Version 3.5 2013-2016  Michael Kupietz: Repackaged to run an Automator text service so can be used directly in FileMaker calc dialogs, go through the section with a million regexs and add comments documenting what they do so humans can understand, minor formatting tweaks to betterize output morely.
 # Version 4 05/13/2017   Michael Kupietz: Numerous small output formatting improvements, improved indentation, added debugging output (see code), minor tweaks for more recent versions of FileMaker. 
 # Version 4.1 03/19/2024 Kludgy fixes to workaround inexplicable problem with // comments and apparent MacOS change from \r to \n.
+# Version 4.2 06/09/2024 Kludgy fixes to fix the problems introduced in v 4.1. Replace for // wasn't always working due to bad regex and possibly to use of \R instead of [\r\n]+.
 # ------------------------ END ------------------------
 #
 #
-# NOTE: This script was written in 2003 as I was learning Perl for the first
+# NOTE [original from Debi Fuchs]: This script was written in 2003 as I was learning Perl for the first
 # time. Please excuse the code; It is pretty atrocious. It was also
 # modified as quickly as possible to handle FileMaker 7.0 calculations
 # when FileMaker 7.0 was first released, and should use spiffy regular
@@ -128,7 +129,7 @@ while(<>)
 {
     $i++;
     $thisLine = $_;
-    $thisLine  =~ s/\/\/([^\r]*)/\/\*DOUBLESLASH$1\*\//gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
+    $thisLine  =~ s/\/\/([^\r\n]*)/\/\*DOUBLESLASH$1\*\//gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
     $calc= $calc . $thisLine ;
 }
 
@@ -405,7 +406,7 @@ sub parsecalc {
 # Parse calculation string into one where all "tokens" are on a separate line
 
     # replace wierd space with normal one
-    $calc =~ s/ / /g;
+    $calc =~ s/ / /g; # Don't be fooled by appearances! This is really s/\x{A0}/ /g.
     
     $calc =~ s/,/;/g; # quotes have already been removed so replace all commas with ; to reduce what parsecalc has to deal with - MKupietz June 2017
     # Parse into tokens based on symbols
@@ -664,13 +665,16 @@ sub writeresult {
     if (not $stringsuccess) {
         print "Unmatched quotes or comments. Please be sure to enter a calculation which validates in FileMaker Pro.\<BR\>\r";
     }
-    $theCredit = "/* Formatted with _Format FM Calc. Service based on Calculation_formatter.pl © 2008 by Debi Fuchs <debi\@aptworks.com> and released under the GNU license. Debugged, modified, updated, and repackaged as a service by Michael Kupietz <consulting-fmsvc\@kupietz.com> https://kupietz.com. Updated again at tremendous risk and great personal expense for nicer formatting in 2017. Released under GNU license, see source code for details. Be excellent to each other. */";
+    $theCredit = "/* Formatted with _Format FM Calc. Service based on Calculation_formatter.pl © 2008 by Debi Fuchs <debi\@aptworks.com> and released under the GNU license. Debugged, modified, updated, and repackaged as a service by Michael Kupietz <consulting-fmsvc\@kupietz.com> https://kupietz.com. Updated again at tremendous risk and great personal expense for nicer formatting 2017-2024. Released under GNU license, see source code for details. Be excellent to each other. */";
+    # Don't remove the above credit. No, seriously. Don't be a dick.    
      $calc =~ s/\r *\Q$theCredit//gi; # \Q quotes meta characters in the variable value so they're not interpreted as regex codes.
-   $calc  =~ s/\/\*DOUBLESLASH([^\r\n]*)\R\*\//\/\/$1/gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
+  # WAS, but replace is failing inside filemaker yet working in BBedit. (Notice: it's wrong either way... there shouldn't ever be a line break before the "\*\/", as there is in the search pattern here.  $calc  =~ s/\/\*DOUBLESLASH([^\r\n]*)\R\*\//\/\/$1/gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
+   $calc  =~ s/\/\*DOUBLESLASH([^\r\n]*)\*\/([\r\n]+)/\/\/$1$2/gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
  $calc =~ s/\r/\n/gi; #hack since mac seems to have adopted \n since I did this MK 2024mar19
 
     print $calc . "\n" . $theCredit . "\n" ; # . $debug;
-# Don't remove the above credit. No, seriously. Don't be a dick.
+    #NOTE, 2024jun9: Changed from \r to \n recently, but looks like MacOS uses \n now but FileMaker still uses \r? Sticking with \n for now, may change in the future. 
+
 }
 
 
