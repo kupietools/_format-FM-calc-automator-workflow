@@ -674,13 +674,16 @@ sub returntostring {
     $calc= substr $calc, 0, (length $calc)-1;
 
 $calc =~ s/(\*\/)\r( *\/\*)/$1%BREAKHERE%$2/g; #put all consecutive comments on one line
-   $calc =~ s/(\r)( *\/\*.*?\*\/\rTHISGETSSPACES)/\rTHISGETSSPACES$2/g; #If THISGETSSPACES follows comment-only line, add it to comment line. #This isn't working for some reason. Don't know why.
-$calc =~ s/(NEXTGETSSPACES\r *\/\*.*?\*\/)(\r)/$1NEXTGETSSPACES\r/g; #If NEXTGETSPACES followed by comment-only line, add it to that line.
-
-   $calc =~ s/(NEXTGETSSPACES\rTHISGETSSPACES)/\r    /g;
-      $calc =~ s/NEXTGETSSPACES\r/\r    /g;
-         $calc =~ s/\rTHISGETSSPACES/\r    /g; # add those extra 2 spaces to any line that matched any of above criteria, without adding too many if it matched more than one.
-  $calc =~    s/NEXTGETSSPACES|THISGETSSPACES//g; #just in case - remove trailing
+   # NEXTGETSSPACES/THISGETSSPACES cleanup removed 2026-08-08: these markers are only ever
+   # inserted by mk_dodoubleindent(), which is dead code (declared, never called anywhere in
+   # this file). With no active code path ever legitimately writing these markers into $calc,
+   # this cleanup could only ever match and destroy a real user field name that happens to
+   # contain the substring "NEXTGETSSPACES" or "THISGETSSPACES" (both legal FileMaker field-name
+   # text) -- confirmed: a calc containing a field literally named NEXTGETSSPACES had that field
+   # name silently deleted entirely, with no warning, before this fix. See project memory /
+   # incident report for the full trace. If mk_dodoubleindent() is ever revived and wired back
+   # in, this cleanup logic will need to be restored (and hardened against colliding with real
+   # field-name text) alongside it -- it should not be re-added on its own.
 $calc =~ s/%BREAKHERE%/\r/g;
 }
 
