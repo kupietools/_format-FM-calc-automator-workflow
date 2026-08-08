@@ -7,3 +7,5 @@ Info.plist text
 # Never let git try to treat these as text.
 *.png binary
 *.zip binary
+*.input text -diff
+*.expected text -diff

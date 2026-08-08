@@ -1,0 +1,9 @@
+~( mkForDo~ ( "loop" ; 1 ; Length(ControlFlowTab_Input_ForDo_LoopVariable) ; 
+
+
+"let(theChar = middle("&GetFieldName ( ControlFlowTab_Input_ForDo_LoopVariable )&",loop,1), 
+
+if ( substitute (theChar,lower(theChar),\"\") =\"\",upper(theChar),lower(theChar)))" 
+
+
+ ) )
