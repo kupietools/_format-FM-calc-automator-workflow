@@ -129,6 +129,14 @@ while(<>)
 {
     $i++;
     $thisLine = $_;
+    # Normalize all incoming line-break styles (\r\n, lone \r) to \n before anything else touches the text.
+    # \r is used throughout this script as its own internal structural delimiter (e.g. %BREAKHERE% at line ~660),
+    # so a raw \r arriving as part of the user's original calc text (line breaks inside a reinserted quoted
+    # string/comment, or between an old-style Mac \r-delimited paste and this script's own \r bookkeeping)
+    # collides with that internal use and can desync the string-replacement stack, causing an infinite loop.
+    # \n is never treated specially anywhere else in this script, so it's the safe form to normalize to.
+    $thisLine =~ s/\r\n/\n/g;
+    $thisLine =~ s/\r/\n/g;
     $thisLine  =~ s/\/\/([^\r\n]*)/\/\*DOUBLESLASH$1\*\//gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
     $calc= $calc . $thisLine ;
 }
@@ -282,6 +290,17 @@ $debug="";
          min_but_not_blank((index $toreplace, "\"", $startposition),
          (index $toreplace, "\?", $startposition)),(index $toreplace, "\%", $startposition)))>=0) {
            $startposition=$startposition2;
+           # Defensive guard: if @stringstack is already empty here, there's a mismatch between the
+           # number of placeholder markers (", ?, %) found in the text and the number of strings/comments
+           # actually stripped out earlier. Without this check, shift() on an empty stack returns undef,
+           # length(undef) is 0, $startposition never advances, and this loop spins forever re-finding the
+           # same character (this is exactly what the \r-normalization above is meant to prevent from
+           # happening in the first place, but this guard exists so a hang can't reoccur via some other
+           # unanticipated path — better to fail fast/visibly here than freeze indefinitely).
+           if (!@stringstack) {
+               warn "mk-format-fm-calc: string-replacement stack exhausted unexpectedly at line $i, position $startposition — bailing out of this line to avoid an infinite loop.\n";
+               last;
+           }
            $replacementstring = shift @stringstack;
              $debug = $debug . $i."◊" . $toreplace . "◊\r";
            $toreplace = ((substr $toreplace, 0, $startposition) . $replacementstring . (substr $toreplace, ($startposition+(length $replacementstring)), length $toreplace));
