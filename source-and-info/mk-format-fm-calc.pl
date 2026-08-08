@@ -137,7 +137,15 @@ while(<>)
     # \n is never treated specially anywhere else in this script, so it's the safe form to normalize to.
     $thisLine =~ s/\r\n/\n/g;
     $thisLine =~ s/\r/\n/g;
-    $thisLine  =~ s/\/\/([^\r\n]*)/\/\*DOUBLESLASH$1\*\//gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
+    # The //-to-DOUBLESLASH conversion that used to run here (added 2024mar19 to route around a
+    # // regression whose actual cause was never found -- see the version-history comments near the
+    # top of this file) was removed 2026-08-08: it ran BEFORE removestrings() ever got a chance to
+    # protect quoted strings/existing comments, so any "//" inside a quoted string (a URL, e.g.
+    # "http://example.com") or inside a real /* */ comment got misread as a live line comment,
+    # corrupting the string/comment and everything after it on that line. removestrings() already
+    # has its own complete, correct //-comment branch using the same strip-to-placeholder mechanism
+    # as /* */ comments and quoted strings -- this kludge was never load-bearing for that, it was an
+    # independent transformation layered on top, upstream of the point where it could do harm safely.
     $calc= $calc . $thisLine ;
 }
 
@@ -376,12 +384,22 @@ $calc =~ s/(\*\/) *\r/$1 /gi;
 
         # If we're dealing with two slashes, find the end of the line
         elsif(((substr $calc2, $leftpos,2) cmp "\/\/")==0) {
-            $rightpos = (index $calc2, "\r", $rightpos+1); 
-#\r used to be \r, but this made the script sometimes break on // lines
+            # Searches for \n, not \r: input line endings are normalized to \n before removestrings()
+            # ever runs (see the input-reading loop above), so \n is what actually terminates a //
+            # comment here. This branch used to search for \r and was effectively dead code in
+            # practice -- every real "//" got intercepted by the DOUBLESLASH kludge (removed
+            # 2026-08-08) before removestrings() ever saw one, so this never-updated search target
+            # was never exercised. Removing the kludge exposed it: without this fix, a // comment
+            # with no following \r in the text (i.e. every normal case now) never finds its end and
+            # swallows everything to the end of the calc into the comment -- confirmed via the
+            # regression corpus (tests/cases/07-line-comment), where "+ 3" following a // comment
+            # ended up genuinely INSIDE the comment placeholder's stashed content, not just visually
+            # adjacent to it -- real, silent code-into-comment corruption, not a cosmetic issue.
+            $rightpos = (index $calc2, "\n", $rightpos+1);
 
             if ($rightpos == -1)
             {$rightpos = length $calc2;}
-    
+
         }
         else
         {
@@ -695,8 +713,10 @@ sub writeresult {
     $theCredit = "/* Formatted with _Format FM Calc. Service based on Calculation_formatter.pl © 2008 by Debi Fuchs <debi\@aptworks.com> and released under the GNU license. Debugged, modified, updated, and repackaged as a service by Michael Kupietz <consulting-fmsvc\@kupietz.com> https://kupietz.com. Updated again at tremendous risk and great personal expense for nicer formatting 2017-2024. Released under GNU license, see source code for details. Be excellent to each other. */";
     # Don't remove the above credit. No, seriously. Don't be a dick.    
      $calc =~ s/\r *\Q$theCredit//gi; # \Q quotes meta characters in the variable value so they're not interpreted as regex codes.
-  # WAS, but replace is failing inside filemaker yet working in BBedit. (Notice: it's wrong either way... there shouldn't ever be a line break before the "\*\/", as there is in the search pattern here.  $calc  =~ s/\/\*DOUBLESLASH([^\r\n]*)\R\*\//\/\/$1/gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
-   $calc  =~ s/\/\*DOUBLESLASH([^\r\n]*)\*\/([\r\n]+)/\/\/$1$2/gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
+  # The DOUBLESLASH-back-to-// reverse conversion that used to run here was removed 2026-08-08
+  # along with its counterpart in the input-reading loop (see the comment there for the full
+  # reasoning) -- // comments now go through removestrings()'s own \x02-placeholder mechanism like
+  # any other comment, so there's nothing left to convert back at this point.
  $calc =~ s/\r/\n/gi; #hack since mac seems to have adopted \n since I did this MK 2024mar19
 
     print $calc . "\n" . $theCredit . "\n" ; # . $debug;
