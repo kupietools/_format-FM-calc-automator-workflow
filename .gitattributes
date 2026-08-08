@@ -1,0 +1,9 @@
+# The Automator workflow bundle's internals are XML plists — always diff/merge as text.
+# (Matched by basename rather than full path, since git's .gitattributes pattern matching
+# doesn't handle the literal spaces in "_Format FM Calc.workflow/..." cleanly.)
+document.wflow text
+Info.plist text
+
+# Never let git try to treat these as text.
+*.png binary
+*.zip binary

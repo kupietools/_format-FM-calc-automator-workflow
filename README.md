@@ -1,7 +1,9 @@
 # _format-FM-calc-automator-workflow
 An Automator workflow for OS X which creats a system service that visually formats FileMaker Pro calculations for easy readability, in any app in the system, even outside of FileMaker.
 
-The workflow is packaged here in a compressed zip file because once upon a time I had some problems with Github mangling something in one of MacOS's "package" folder-as-a-document structures, as Automator workflows such as this are. The .zip compression simply ensures the workflow is preserved as-is from my hard drive to yours. 
+**Download:** grab the latest `_Format FM Calc.workflow.zip` from the [Releases page](https://github.com/kupietools/_format-FM-calc-automator-workflow/releases) — that's the ready-to-install package.
+
+The `_Format FM Calc.workflow` folder in this repo's source tree is the actual editable source (a macOS Automator "package," which git and GitHub both handle as a plain folder of files — nothing about that affects how it behaves once it's on your Mac; Finder still recognizes and displays it as a package based on its `.workflow` extension, regardless of how it got there). The zip is a separate, generated distributable — it's what you should actually download and install, not the raw repo folder, and it's kept off to the side in Releases rather than the source tree so it can't go stale/out of sync with the source unnoticed the way it once did.
 
 After unzipping, you will want to open the workflow in Automator and look at it before you add it to your Services folder. Just look at it so you see for yourself that it's innocent and does what it says, and there's nothing tricky about it. This is just a good habit, for security. Don't go adding things to your system because a stranger on github said you can. 
 
