@@ -130,7 +130,7 @@ while(<>)
     $i++;
     $thisLine = $_;
     # Normalize all incoming line-break styles (\r\n, lone \r) to \n before anything else touches the text.
-    # \r is used throughout this script as its own internal structural delimiter (e.g. %BREAKHERE% at line ~660),
+    # \r is used throughout this script as its own internal structural delimiter (e.g. the \x03 marker,
     # so a raw \r arriving as part of the user's original calc text (line breaks inside a reinserted quoted
     # string/comment, or between an old-style Mac \r-delimited paste and this script's own \r bookkeeping)
     # collides with that internal use and can desync the string-replacement stack, causing an infinite loop.
@@ -312,7 +312,11 @@ $debug="";
            $replacementstring = shift @stringstack;
              $debug = $debug . $i."◊" . $toreplace . "◊\r";
            $toreplace = ((substr $toreplace, 0, $startposition) . $replacementstring . (substr $toreplace, ($startposition+(length $replacementstring)), length $toreplace));
-  $toreplace =~ s/\r/%BREAKHERE%/g;
+  # Marker is \x03 (a control character), not the printable "%BREAKHERE%" text this used to be --
+  # %BREAKHERE% collided with real field-name text the same way %/? did (both letters and % are
+  # legal field-name characters), silently deleting a field literally named %BREAKHERE% from the
+  # output. See project memory / incident report for the full trace.
+  $toreplace =~ s/\r/\x03/g;
              $debug = $debug . $i."ππ" . $toreplace . "ππ\r";
                     
 
@@ -691,7 +695,7 @@ sub returntostring {
     
     $calc= substr $calc, 0, (length $calc)-1;
 
-$calc =~ s/(\*\/)\r( *\/\*)/$1%BREAKHERE%$2/g; #put all consecutive comments on one line
+$calc =~ s/(\*\/)\r( *\/\*)/$1\x03$2/g; #put all consecutive comments on one line (marker hardened to \x03, see comment near line 315)
    # NEXTGETSSPACES/THISGETSSPACES cleanup removed 2026-08-08: these markers are only ever
    # inserted by mk_dodoubleindent(), which is dead code (declared, never called anywhere in
    # this file). With no active code path ever legitimately writing these markers into $calc,
@@ -702,7 +706,7 @@ $calc =~ s/(\*\/)\r( *\/\*)/$1%BREAKHERE%$2/g; #put all consecutive comments on 
    # incident report for the full trace. If mk_dodoubleindent() is ever revived and wired back
    # in, this cleanup logic will need to be restored (and hardened against colliding with real
    # field-name text) alongside it -- it should not be re-added on its own.
-$calc =~ s/%BREAKHERE%/\r/g;
+$calc =~ s/\x03/\r/g;
 }
 
 
