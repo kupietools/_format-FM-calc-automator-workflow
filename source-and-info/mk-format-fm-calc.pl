@@ -304,9 +304,21 @@ $debug="";
            # length(undef) is 0, $startposition never advances, and this loop spins forever re-finding the
            # same character (this is exactly what the \r-normalization above is meant to prevent from
            # happening in the first place, but this guard exists so a hang can't reoccur via some other
-           # unanticipated path — better to fail fast/visibly here than freeze indefinitely).
+           # unanticipated path).
+           #
+           # Rather than just warning to stderr and letting formatting continue (which would ship
+           # visibly-corrupted output, or worse -- output that LOOKS fine but silently has the wrong
+           # content spliced in), record a specific diagnostic and let writeresult() suppress the
+           # formatted output entirely in favor of reporting the problem. See @formatting_errors.
            if (!@stringstack) {
-               warn "mk-format-fm-calc: string-replacement stack exhausted unexpectedly at line $i, position $startposition — bailing out of this line to avoid an infinite loop.\n";
+               my $charfound = substr($toreplace, $startposition, 1);
+               my $kind = ($charfound eq "\"") ? 'a quote character (")'
+                        : ($charfound eq "\x01") ? 'this formatter\'s internal /* */-comment marker'
+                        : ($charfound eq "\x02") ? 'this formatter\'s internal //-comment marker'
+                        : "an unexpected byte (0x" . sprintf("%02X", ord($charfound)) . ")";
+               my $snippet_start = ($startposition - 25 > 0) ? $startposition - 25 : 0;
+               my $snippet = substr($toreplace, $snippet_start, 60);
+               push @formatting_errors, "Found $kind where none was expected (line $i of the internal reformatted representation, near: ...$snippet...). This usually means something in the calc's actual text is being mistaken for this formatter's own internal bookkeeping.";
                last;
            }
            $replacementstring = shift @stringstack;
@@ -327,6 +339,17 @@ $debug="";
            $j=$j+1;
        }
     $i=$i+1;
+    }
+
+    # The guard above catches finding MORE apparent markers than real stripped content (the stack
+    # runs out). This catches the opposite direction: real quoted strings/comments that were
+    # extracted by removestrings() but never made it back in, because their marker was somehow
+    # never found during the scan above (e.g. hidden by some other regex, rather than an extra
+    # false marker appearing). Without this, that content would just silently vanish from the
+    # output -- worse than the exhausted-stack case, since nothing about the printed output would
+    # look obviously wrong.
+    if (@stringstack) {
+        push @formatting_errors, "The formatter extracted " . (scalar @stringstack) . " quoted string(s)/comment(s) from the calc that never made it back into the output:\n" . join("\n", map { "  - $_" } @stringstack) . "\nThis usually means something elsewhere in the calc is being mistaken for this formatter's own internal bookkeeping, causing content to be dropped instead of reinserted.";
     }
 }
 
@@ -711,6 +734,19 @@ $calc =~ s/\x03/\r/g;
 
 
 sub writeresult {
+    # If replacestrings() detected its own internal bookkeeping had gotten out of sync (see the two
+    # guards there), don't print the formatted $calc at all -- it's either visibly corrupted or,
+    # worse, LOOKS fine but silently has the wrong content spliced into it. Report specifically what
+    # went wrong instead, and exit non-zero, rather than shipping output that can't be trusted.
+    if (@formatting_errors) {
+        print "This calculation could not be formatted reliably. The formatter detected a problem with its own internal bookkeeping while processing it -- most likely something in the calc's actual text is being mistaken for the formatter's own internal markup. No formatted output was produced, to avoid silently corrupting your calculation.\n\n";
+        print "Details:\n\n";
+        for my $err (@formatting_errors) {
+            print "$err\n\n";
+        }
+        print "Your original calc text has already been replaced by this message in whatever field/window it was selected in (this is how the Automator Service/BBEdit filter works) -- press Cmd+Z (Undo) now to get it back, BEFORE doing anything else, rather than trying to reconstruct it from memory. Once you've recovered it, please report this issue including the details above.\n";
+        exit 1;
+    }
     if (not $stringsuccess) {
         print "Unmatched quotes or comments. Please be sure to enter a calculation which validates in FileMaker Pro.\<BR\>\r";
     }

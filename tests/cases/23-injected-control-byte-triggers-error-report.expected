@@ -1,0 +1,7 @@
+This calculation could not be formatted reliably. The formatter detected a problem with its own internal bookkeeping while processing it -- most likely something in the calc's actual text is being mistaken for the formatter's own internal markup. No formatted output was produced, to avoid silently corrupting your calculation.
+
+Details:
+
+Found a quote character (") where none was expected (line 1 of the internal reformatted representation, near: ..."qqq"...). This usually means something in the calc's actual text is being mistaken for this formatter's own internal bookkeeping.
+
+Your original calc text has already been replaced by this message in whatever field/window it was selected in (this is how the Automator Service/BBEdit filter works) -- press Cmd+Z (Undo) now to get it back, BEFORE doing anything else, rather than trying to reconstruct it from memory. Once you've recovered it, please report this issue including the details above.
