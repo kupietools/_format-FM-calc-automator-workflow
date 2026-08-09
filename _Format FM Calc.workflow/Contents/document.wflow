@@ -191,14 +191,22 @@ while(&lt;&gt;)
     $i++;
     $thisLine = $_;
     # Normalize all incoming line-break styles (\r\n, lone \r) to \n before anything else touches the text.
-    # \r is used throughout this script as its own internal structural delimiter (e.g. %BREAKHERE% at line ~660),
+    # \r is used throughout this script as its own internal structural delimiter (e.g. the \x03 marker,
     # so a raw \r arriving as part of the user's original calc text (line breaks inside a reinserted quoted
     # string/comment, or between an old-style Mac \r-delimited paste and this script's own \r bookkeeping)
     # collides with that internal use and can desync the string-replacement stack, causing an infinite loop.
     # \n is never treated specially anywhere else in this script, so it's the safe form to normalize to.
     $thisLine =~ s/\r\n/\n/g;
     $thisLine =~ s/\r/\n/g;
-    $thisLine  =~ s/\/\/([^\r\n]*)/\/\*DOUBLESLASH$1\*\//gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
+    # The //-to-DOUBLESLASH conversion that used to run here (added 2024mar19 to route around a
+    # // regression whose actual cause was never found -- see the version-history comments near the
+    # top of this file) was removed 2026-08-08: it ran BEFORE removestrings() ever got a chance to
+    # protect quoted strings/existing comments, so any "//" inside a quoted string (a URL, e.g.
+    # "http://example.com") or inside a real /* */ comment got misread as a live line comment,
+    # corrupting the string/comment and everything after it on that line. removestrings() already
+    # has its own complete, correct //-comment branch using the same strip-to-placeholder mechanism
+    # as /* */ comments and quoted strings -- this kludge was never load-bearing for that, it was an
+    # independent transformation layered on top, upstream of the point where it could do harm safely.
     $calc= $calc . $thisLine ;
 }
 
@@ -357,15 +365,31 @@ $debug="";
            # length(undef) is 0, $startposition never advances, and this loop spins forever re-finding the
            # same character (this is exactly what the \r-normalization above is meant to prevent from
            # happening in the first place, but this guard exists so a hang can't reoccur via some other
-           # unanticipated path — better to fail fast/visibly here than freeze indefinitely).
+           # unanticipated path).
+           #
+           # Rather than just warning to stderr and letting formatting continue (which would ship
+           # visibly-corrupted output, or worse -- output that LOOKS fine but silently has the wrong
+           # content spliced in), record a specific diagnostic and let writeresult() suppress the
+           # formatted output entirely in favor of reporting the problem. See @formatting_errors.
            if (!@stringstack) {
-               warn "mk-format-fm-calc: string-replacement stack exhausted unexpectedly at line $i, position $startposition — bailing out of this line to avoid an infinite loop.\n";
+               my $charfound = substr($toreplace, $startposition, 1);
+               my $kind = ($charfound eq "\"") ? 'a quote character (")'
+                        : ($charfound eq "\x01") ? 'this formatter\'s internal /* */-comment marker'
+                        : ($charfound eq "\x02") ? 'this formatter\'s internal //-comment marker'
+                        : "an unexpected byte (0x" . sprintf("%02X", ord($charfound)) . ")";
+               my $snippet_start = ($startposition - 25 &gt; 0) ? $startposition - 25 : 0;
+               my $snippet = substr($toreplace, $snippet_start, 60);
+               push @formatting_errors, "Found $kind where none was expected (line $i of the internal reformatted representation, near: ...$snippet...). This usually means something in the calc's actual text is being mistaken for this formatter's own internal bookkeeping.";
                last;
            }
            $replacementstring = shift @stringstack;
              $debug = $debug . $i."◊" . $toreplace . "◊\r";
            $toreplace = ((substr $toreplace, 0, $startposition) . $replacementstring . (substr $toreplace, ($startposition+(length $replacementstring)), length $toreplace));
-  $toreplace =~ s/\r/%BREAKHERE%/g;
+  # Marker is \x03 (a control character), not the printable "%BREAKHERE%" text this used to be --
+  # %BREAKHERE% collided with real field-name text the same way %/? did (both letters and % are
+  # legal field-name characters), silently deleting a field literally named %BREAKHERE% from the
+  # output. See project memory / incident report for the full trace.
+  $toreplace =~ s/\r/\x03/g;
              $debug = $debug . $i."ππ" . $toreplace . "ππ\r";
                     
 
@@ -376,6 +400,17 @@ $debug="";
            $j=$j+1;
        }
     $i=$i+1;
+    }
+
+    # The guard above catches finding MORE apparent markers than real stripped content (the stack
+    # runs out). This catches the opposite direction: real quoted strings/comments that were
+    # extracted by removestrings() but never made it back in, because their marker was somehow
+    # never found during the scan above (e.g. hidden by some other regex, rather than an extra
+    # false marker appearing). Without this, that content would just silently vanish from the
+    # output -- worse than the exhausted-stack case, since nothing about the printed output would
+    # look obviously wrong.
+    if (@stringstack) {
+        push @formatting_errors, "The formatter extracted " . (scalar @stringstack) . " quoted string(s)/comment(s) from the calc that never made it back into the output:\n" . join("\n", map { "  - $_" } @stringstack) . "\nThis usually means something elsewhere in the calc is being mistaken for this formatter's own internal bookkeeping, causing content to be dropped instead of reinserted.";
     }
 }
 
@@ -437,12 +472,22 @@ $calc =~ s/(\*\/) *\r/$1 /gi;
 
         # If we're dealing with two slashes, find the end of the line
         elsif(((substr $calc2, $leftpos,2) cmp "\/\/")==0) {
-            $rightpos = (index $calc2, "\r", $rightpos+1); 
-#\r used to be \r, but this made the script sometimes break on // lines
+            # Searches for \n, not \r: input line endings are normalized to \n before removestrings()
+            # ever runs (see the input-reading loop above), so \n is what actually terminates a //
+            # comment here. This branch used to search for \r and was effectively dead code in
+            # practice -- every real "//" got intercepted by the DOUBLESLASH kludge (removed
+            # 2026-08-08) before removestrings() ever saw one, so this never-updated search target
+            # was never exercised. Removing the kludge exposed it: without this fix, a // comment
+            # with no following \r in the text (i.e. every normal case now) never finds its end and
+            # swallows everything to the end of the calc into the comment -- confirmed via the
+            # regression corpus (tests/cases/07-line-comment), where "+ 3" following a // comment
+            # ended up genuinely INSIDE the comment placeholder's stashed content, not just visually
+            # adjacent to it -- real, silent code-into-comment corruption, not a cosmetic issue.
+            $rightpos = (index $calc2, "\n", $rightpos+1);
 
             if ($rightpos == -1)
             {$rightpos = length $calc2;}
-    
+
         }
         else
         {
@@ -734,7 +779,7 @@ sub returntostring {
     
     $calc= substr $calc, 0, (length $calc)-1;
 
-$calc =~ s/(\*\/)\r( *\/\*)/$1%BREAKHERE%$2/g; #put all consecutive comments on one line
+$calc =~ s/(\*\/)\r( *\/\*)/$1\x03$2/g; #put all consecutive comments on one line (marker hardened to \x03, see comment near line 315)
    # NEXTGETSSPACES/THISGETSSPACES cleanup removed 2026-08-08: these markers are only ever
    # inserted by mk_dodoubleindent(), which is dead code (declared, never called anywhere in
    # this file). With no active code path ever legitimately writing these markers into $calc,
@@ -745,19 +790,34 @@ $calc =~ s/(\*\/)\r( *\/\*)/$1%BREAKHERE%$2/g; #put all consecutive comments on 
    # incident report for the full trace. If mk_dodoubleindent() is ever revived and wired back
    # in, this cleanup logic will need to be restored (and hardened against colliding with real
    # field-name text) alongside it -- it should not be re-added on its own.
-$calc =~ s/%BREAKHERE%/\r/g;
+$calc =~ s/\x03/\r/g;
 }
 
 
 sub writeresult {
+    # If replacestrings() detected its own internal bookkeeping had gotten out of sync (see the two
+    # guards there), don't print the formatted $calc at all -- it's either visibly corrupted or,
+    # worse, LOOKS fine but silently has the wrong content spliced into it. Report specifically what
+    # went wrong instead, and exit non-zero, rather than shipping output that can't be trusted.
+    if (@formatting_errors) {
+        print "This calculation could not be formatted reliably. The formatter detected a problem with its own internal bookkeeping while processing it -- most likely something in the calc's actual text is being mistaken for the formatter's own internal markup. No formatted output was produced, to avoid silently corrupting your calculation.\n\n";
+        print "Details:\n\n";
+        for my $err (@formatting_errors) {
+            print "$err\n\n";
+        }
+        print "Your original calc text has already been replaced by this message in whatever field/window it was selected in (this is how the Automator Service/BBEdit filter works) -- press Cmd+Z (Undo) now to get it back, BEFORE doing anything else, rather than trying to reconstruct it from memory. Once you've recovered it, please report this issue including the details above.\n";
+        exit 1;
+    }
     if (not $stringsuccess) {
         print "Unmatched quotes or comments. Please be sure to enter a calculation which validates in FileMaker Pro.\&lt;BR\&gt;\r";
     }
     $theCredit = "/* Formatted with _Format FM Calc. Service based on Calculation_formatter.pl © 2008 by Debi Fuchs &lt;debi\@aptworks.com&gt; and released under the GNU license. Debugged, modified, updated, and repackaged as a service by Michael Kupietz &lt;consulting-fmsvc\@kupietz.com&gt; https://kupietz.com. Updated again at tremendous risk and great personal expense for nicer formatting 2017-2024. Released under GNU license, see source code for details. Be excellent to each other. */";
     # Don't remove the above credit. No, seriously. Don't be a dick.    
      $calc =~ s/\r *\Q$theCredit//gi; # \Q quotes meta characters in the variable value so they're not interpreted as regex codes.
-  # WAS, but replace is failing inside filemaker yet working in BBedit. (Notice: it's wrong either way... there shouldn't ever be a line break before the "\*\/", as there is in the search pattern here.  $calc  =~ s/\/\*DOUBLESLASH([^\r\n]*)\R\*\//\/\/$1/gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
-   $calc  =~ s/\/\*DOUBLESLASH([^\r\n]*)\*\/([\r\n]+)/\/\/$1$2/gi; #ugly kludge since double-slash comments stopped working and I can't figure out why. MK 2024mar19
+  # The DOUBLESLASH-back-to-// reverse conversion that used to run here was removed 2026-08-08
+  # along with its counterpart in the input-reading loop (see the comment there for the full
+  # reasoning) -- // comments now go through removestrings()'s own \x02-placeholder mechanism like
+  # any other comment, so there's nothing left to convert back at this point.
  $calc =~ s/\r/\n/gi; #hack since mac seems to have adopted \n since I did this MK 2024mar19
 
     print $calc . "\n" . $theCredit . "\n" ; # . $debug;
