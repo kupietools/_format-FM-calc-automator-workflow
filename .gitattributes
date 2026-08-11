@@ -7,5 +7,11 @@ Info.plist text
 # Never let git try to treat these as text.
 *.png binary
 *.zip binary
-*.input text -diff
-*.expected text -diff
+# -text (not "text"): several test cases (17, 18) deliberately contain raw \r-only / \r\n line
+# endings as the actual test payload, not as this file's own line-ending convention. The plain
+# "text" attribute previously used here told git to NORMALIZE line endings -- confirmed via a
+# fresh clone showing those files as locally "modified" immediately after checkout with git
+# warning "CRLF will be replaced by LF the next time Git touches it". -text disables any line-
+# ending conversion on checkin/checkout entirely, so these bytes are preserved exactly.
+*.input -text -diff
+*.expected -text -diff
