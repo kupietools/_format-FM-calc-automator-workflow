@@ -798,7 +798,14 @@ sub writeresult {
     # If replacestrings() detected its own internal bookkeeping had gotten out of sync (see the two
     # guards there), don't print the formatted $calc at all -- it's either visibly corrupted or,
     # worse, LOOKS fine but silently has the wrong content spliced into it. Report specifically what
-    # went wrong instead, and exit non-zero, rather than shipping output that can't be trusted.
+    # went wrong instead, and exit -- rather than shipping output that can't be trusted.
+    #
+    # Exit 0, not a nonzero code: confirmed via the real `automator` CLI (not just direct perl
+    # invocation) that Automator's "Run Shell Script" action treats a nonzero exit as the ACTION
+    # ITSELF failing and discards the script's entire stdout -- the user would see a generic, empty
+    # "The action 'Run Shell Script' encountered an error" with none of this diagnostic text, which
+    # defeats the entire point of writing it. Exit 0 with this message as the only stdout content is
+    # confirmed (same tool) to pass through correctly as the Service's replacement text.
     if (@formatting_errors) {
         print "This calculation could not be formatted reliably. The formatter detected a problem with its own internal bookkeeping while processing it -- most likely something in the calc's actual text is being mistaken for the formatter's own internal markup. No formatted output was produced, to avoid silently corrupting your calculation.\n\n";
         print "Details:\n\n";
@@ -806,7 +813,7 @@ sub writeresult {
             print "$err\n\n";
         }
         print "Your original calc text has already been replaced by this message in whatever field/window it was selected in (this is how the Automator Service/BBEdit filter works) -- press Cmd+Z (Undo) now to get it back, BEFORE doing anything else, rather than trying to reconstruct it from memory. Once you've recovered it, please report this issue including the details above.\n";
-        exit 1;
+        exit 0;
     }
     if (not $stringsuccess) {
         print "Unmatched quotes or comments. Please be sure to enter a calculation which validates in FileMaker Pro.\&lt;BR\&gt;\r";
